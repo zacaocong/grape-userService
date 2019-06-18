@@ -1,317 +1,288 @@
 package com.etekcity.userservice.service;
 
+import javax.servlet.http.HttpServletRequest;
+import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
-import com.etekcity.userservice.constant.ErrorCodes;
-import com.etekcity.userservice.dao.mapper.UserMapper;
-import com.etekcity.userservice.moudle.User;
-import com.etekcity.userservice.moudle.X_Authorization;
-import com.etekcity.userservice.response.res.*;
+import com.etekcity.userservice.constant.ErrorCode;
+import com.etekcity.userservice.constant.HeaderFields;
+import com.etekcity.userservice.dao.UserMapper;
+import com.etekcity.userservice.module.User;
+import com.etekcity.userservice.module.XAuthorization;
+import com.etekcity.userservice.redisconfig.RedisServiceImpl;
+import com.etekcity.userservice.request.ChangePasswordBody;
+import com.etekcity.userservice.request.LoginBody;
+import com.etekcity.userservice.request.RegisterBody;
+import com.etekcity.userservice.request.UpdateUserInfoBody;
 import com.etekcity.userservice.response.result.GetUserInfoResult;
 import com.etekcity.userservice.response.result.LoginResult;
 import com.etekcity.userservice.response.result.RegisterResult;
-import com.etekcity.userservice.util.CheckUtils;
-import com.etekcity.userservice.util.GetUUID;
-import com.etekcity.userservice.util.RedisUtils;
-import com.etekcity.userservice.util.TokenUtils;
+import com.etekcity.userservice.response.rsp.Response;
+import com.etekcity.userservice.utils.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
-import java.util.Date;
+
 
 @Service
 public class UserServiceImpl implements UserService {
 
-    @Autowired//接口调用必须注入
-    private UserMapper userMapper;//数据库
     @Autowired
-    private RedisUtils redisUtils;//redis
+    private UserMapper userMapper;
     @Autowired
-    private StringRedisTemplate stringRedisTemplate;
+    private RedisServiceImpl<XAuthorization> redisService;
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private SimpleDateFormat ft = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
 
-    //注册
-    public RegisterRes registerService(String email, String password){
-        RegisterRes registerRes = new RegisterRes();//响应消息
-        //邮箱校验
-        if(!CheckUtils.checkEmail(email)){
-            registerRes.setCode(ErrorCodes.EMAILILLEGAL);
-            registerRes.setMsg("email illegal");
-            return registerRes;
+    @Override
+    public Response register(RegisterBody requestBody) {
+        logger.debug("register accept request");
+        //邮箱密码规范性校验
+        if (!CheckUtils.checkEmail(requestBody.getEmail()) || requestBody.getEmail() == null) {
+            return new Response(ErrorCode.EMAIL_ILLEGAL);
         }
-        //密码校验
-        if(!CheckUtils.checkpassword(password)){
-            registerRes.setCode(ErrorCodes.PASSWORDILLEGAL);
-            registerRes.setMsg("password illegal");
-            return registerRes;
+        if (!CheckUtils.checkpassword(requestBody.getPassword()) || requestBody.getPassword() == null) {
+            return new Response((ErrorCode.PASSWORD_ILLEGAL));
         }
-        //邮箱未注册
-        if(userMapper.getUserByEmail(email)!= null){
-            registerRes.setCode(ErrorCodes.EMAILREGISTERED);
-            registerRes.setMsg("email registered");
-            return registerRes;
-        }
-        //生成ID和创建时间。
-        String id = GetUUID.getUUID32();
-        Timestamp timestamp = new Timestamp(new Date().getTime());
-        //对象初始化
-        registerRes.setCode(ErrorCodes.SUCCESS);
-        registerRes.setMsg("success");
-        registerRes.setResult(new RegisterResult(id, timestamp));//这里初始化result
 
-        //数据库插入
-        userMapper.insert(id,email,password,timestamp);
-        return registerRes;
+        logger.debug("register read");
+        if (userMapper.getUserByEmail(requestBody.getEmail()) != null) {
+            //这里需要邮箱未注册，即数据库中不存在该邮箱，否则按如下处理
+            return new Response(ErrorCode.EMAIL_REGISTERED);
+        }
+
+        Response response = new Response(ErrorCode.SUCCESS);
+        String userId = UUIDUtils.getUUID32();
+
+        //存入时间和打印时间差了8小时，这应该是timezone导致的,UTC改为CTT显示正常
+        Date now = new Date();
+        String formatCreateAt = ft.format(now);
+        response.setResult(new RegisterResult(userId, formatCreateAt));
+
+        //加密
+        String encryptedPassword;
+        try {
+            encryptedPassword = MD5Utils.getMD5Str(requestBody.getPassword());
+        } catch (NoSuchAlgorithmException e) {
+            logger.debug("请求加密算法失败，请检查是否存在该算法");
+            return new Response(ErrorCode.SEVER_INTERNAL_ERROR);
+        }
+
+        logger.debug("register write sql");
+        userMapper.insert(userId, requestBody.getEmail(), encryptedPassword, now, now);
+
+        return response;
     }
 
-    //登录
-    public LoginRes loginService(String email, String password){
-        LoginRes loginRes = new LoginRes();
-        //邮箱校验
-        if(!CheckUtils.checkEmail(email)){
-            loginRes.setCode(ErrorCodes.EMAILILLEGAL);
-            loginRes.setMsg("email illegal");
-            return loginRes;
+    @Override
+    public Response login(LoginBody requestBody) {
+        //注册登录时的校验，也可封装，不过只用了两次
+        //邮箱密码规范性校验
+        logger.debug("login accept request ");
+        if (!CheckUtils.checkEmail(requestBody.getEmail()) || requestBody.getEmail() == null) {
+            return new Response(ErrorCode.EMAIL_ILLEGAL);
         }
-        //密码校验
-        if(!CheckUtils.checkpassword(password)){
-            loginRes.setCode(ErrorCodes.PASSWORDILLEGAL);
-            loginRes.setMsg("password illegal");
-            return loginRes;
+        if (!CheckUtils.checkpassword(requestBody.getPassword()) || requestBody.getPassword() == null) {
+            return new Response((ErrorCode.PASSWORD_ILLEGAL));
         }
-        //邮箱未注册
-        if(userMapper.getUserByEmail(email)==null){
-            loginRes.setCode(ErrorCodes.EMAILUNEXIST);
-            loginRes.setMsg("email unexist");
-            return loginRes;
+        logger.debug("register read sql");
+        if (userMapper.getUserByEmail(requestBody.getEmail()) == null) {
+            //这里需要邮箱已注册，即数据库中存在该邮箱，否则按如下处理
+            return new Response(ErrorCode.EMAIL_REGISTERED);
         }
-        //密码不正确????这里出问题了，密码都成错的了
-        if(!password.equals(userMapper.findPasswordByEmail(email))){
-            loginRes.setCode(ErrorCodes.PASSWORDERROR);
-            loginRes.setMsg("password error");
-            return loginRes;
-        }
-        //读数据库，获取userId，nickname,address,creatAt,updateAt
-        User user = userMapper.getUserByEmail(email);
-        String userId = user.getId();
-        String nickname = user.getNickname();
-        String address = user.getAddress();
-        Timestamp createAt = user.getCreateAt();
-        Timestamp updateAt = user.getUpdateAt();
 
-        //封装X_Authorization值  redis value
+        //这里实际上是需要加密后比对的
+        String encryptedPassword;
+        try {
+            encryptedPassword = MD5Utils.getMD5Str(requestBody.getPassword());
+        } catch (NoSuchAlgorithmException e) {
+            logger.debug("请求加密算法失败，请检查是否存在该算法");
+            return new Response(ErrorCode.SEVER_INTERNAL_ERROR);
+        }
+        if (!encryptedPassword.equals(userMapper.findPasswordByEmail(requestBody.getEmail()))) {
+            return new Response(ErrorCode.PASSWORD_ERROR);
+        }
+
+        Response response = new Response(ErrorCode.SUCCESS);
+        logger.debug("register read sql");
+        User user = userMapper.getUserByEmail(requestBody.getEmail());
         String token = TokenUtils.getUUToken();
-        X_Authorization x_authorization = new X_Authorization();
-        x_authorization.setUserId(userId);
-        x_authorization.setToken(token);
-        //key value token  x_authorization(token,userid,count)写入redis
-        redisUtils.set(token,x_authorization,86400L);
+        XAuthorization xAuthorization = new XAuthorization(user.getUserId(), token);
+        logger.debug("register write redis");
+        redisService.set(token, xAuthorization, 86400L);
 
-//        //redis string
-//        String token = TokenUtils.getUUToken();
-//        //key value token userid写入redis
-//        redisUtils.set(token,userId,86400L);
+        LoginResult loginResult = new LoginResult(token, user.getUserId(), user.getNickname(),
+                user.getAddress(), user.getEmail(), ft.format(user.getCreateAt()), ft.format(user.getUpdateAt()),
+                86400L);
 
-        //result初始化：token，expiresIn,userId,email,nickname,address,creatAt,updateAt
-        LoginResult loginResult = new LoginResult();
-        loginResult.setToken(token);
-        loginResult.setExpiresIn(86400L);
-        loginResult.setUserId(userId);
-        loginResult.setEmail(email);
-        loginResult.setNickName(nickname);
-        loginResult.setAddress(address);
-        loginResult.setCreateAt(createAt);
-        loginResult.setUpdateAt(updateAt);
+        response.setResult(loginResult);
 
-        //响应消息初始化
-        loginRes.setCode(ErrorCodes.SUCCESS);
-        loginRes.setMsg("success");
-        loginRes.setResult(loginResult);
-
-        return loginRes;
+        return response;
     }
 
-    //登出
-    public LogoutRes logoutService(String token,String userId){
-        LogoutRes logoutRes = new LogoutRes();//响应消息
-        X_Authorization x_authorization = new X_Authorization();//接收redis中的value
-
-        //token有效性验证
-        if(!redisUtils.existsKey(token)){
-            logoutRes.setCode(ErrorCodes.TOKENDISABLED);
-            logoutRes.setMsg("token disabled");
-            return logoutRes;
-        }//到这都是正常的
-
-        //存的id
-        x_authorization= (X_Authorization) redisUtils.get(token);//查出来的是object，无法操作，怎么转成我们需要的类型呢，可强转
-        String userIdInRedis = x_authorization.getUserId();
-
-        //((X_Authorization) redisUtils.get(token)).getUserId()
-        //token正确性验证,？？？？？？？这里又出错了
-        if(!userId.equals(((X_Authorization) redisUtils.get(token)).getUserId())){
-            logoutRes.setCode(ErrorCodes.TOKENERROR);
-            return logoutRes;
+    @Override
+    public Response logout(HttpServletRequest request) {
+        logger.debug("logout accept request");
+        if (request.getHeader(HeaderFields.authorization) == null) {
+            return new Response(ErrorCode.TOKEN_NULL);
         }
-//        if(!userId.equals(userIdInRedis)){
-//            logoutRes.setCode(ErrorCodes.TOKENERROR);
-//            logoutRes.setMsg("token error");
-//            return logoutRes;
-//        }
+        //string处理,封装一下，重复使用了4次
+        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.authorization));
+        String userId = params[0];
+        String token = params[1];
+        //token有效性正确性
+        if (!redisService.existsKey(token)) {
+            return new Response(ErrorCode.TOKEN_DISABLED);
+        }
+        if (!redisService.get(token).getUserId().equals(userId)) {
+            return new Response(ErrorCode.TOKEN_ERROR);
+        }
 
-        //redis删除
-        redisUtils.deleteKey(token);
+        redisService.deleteKey(token);
 
-        //响应消息初始化
-        logoutRes.setCode(ErrorCodes.SUCCESS);
-        logoutRes.setMsg("success");
-        logoutRes.setResult(null);
-        return logoutRes;
+        return new Response(ErrorCode.SUCCESS);
     }
 
-    //获取用户信息
-    public GetUserInfoRes getUserInfoService(String token,String userId){
-        GetUserInfoRes getUserInfoRes = new GetUserInfoRes();//响应消息
-        X_Authorization x_authorization = new X_Authorization();//接收redis中的value
-        //token有效性验证
-        if(!redisUtils.existsKey(token)){
-            getUserInfoRes.setCode(ErrorCodes.TOKENDISABLED);
-            getUserInfoRes.setMsg("token disabled");
-            return getUserInfoRes;
+    @Override
+    public Response getUserInfo(HttpServletRequest request) {
+        logger.debug("getUserInfo accept request");
+        if (request.getHeader(HeaderFields.authorization) == null) {
+            return new Response(ErrorCode.TOKEN_NULL);
         }
-        //存的id
-        x_authorization= (X_Authorization) redisUtils.get(token);//查出来的是object，无法操作，怎么转成我们需要的类型呢，可强转
-        String userIdInRedis = x_authorization.getUserId();
-        //token正确性验证
-        if(!userId.equals(userIdInRedis)){
-            getUserInfoRes.setCode(ErrorCodes.TOKENERROR);
-            getUserInfoRes.setMsg("token erroe");
-            return getUserInfoRes;
+        //string处理，封装
+        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.authorization));
+        String userId = params[0];
+        String token = params[1];
+        //token有效性正确性
+        logger.debug("getUserInfo read redis");
+        if (!redisService.existsKey(token)) {
+            return new Response(ErrorCode.TOKEN_DISABLED);
+        }
+        if (!redisService.get(token).getUserId().equals(userId)) {
+            return new Response(ErrorCode.TOKEN_ERROR);
         }
 
+        Response response = new Response(ErrorCode.SUCCESS);
+        logger.debug("getUserInfo read redis");
+        GetUserInfoResult getUserInfoResult = new GetUserInfoResult(
+                userMapper.getUserById(userId).getUserId(),
+                userMapper.getUserById(userId).getEmail(),
+                userMapper.getUserById(userId).getNickname(),
+                userMapper.getUserById(userId).getAddress(),
+                ft.format(userMapper.getUserById(userId).getCreateAt()),
+                ft.format(userMapper.getUserById(userId).getUpdateAt())
+        );
 
-        //读数据库，获取userId，nickname,address,creatAt,updateAt
-        //result:userId,email,nickname,address,createAt,updateAt
-        GetUserInfoResult getUserInfoResult = new GetUserInfoResult();
-        getUserInfoResult.setUserId(userMapper.getUserById(userId).getUserId());//这里出错了，为啥是空的啊，别的都正常
-        getUserInfoResult.setEmail(userMapper.getUserById(userId).getEmail());
-        getUserInfoResult.setNickname(userMapper.getUserById(userId).getNickname());
-        getUserInfoResult.setAddress(userMapper.getUserById(userId).getAddress());
-        getUserInfoResult.setCreateAt(userMapper.getUserById(userId).getCreateAt());
-        getUserInfoResult.setUpdateAt(userMapper.getUserById(userId).getUpdateAt());
+        response.setResult(getUserInfoResult);
 
-        //响应消息初始化
-        getUserInfoRes.setCode(ErrorCodes.SUCCESS);
-        getUserInfoRes.setMsg("success");
-        getUserInfoRes.setResult(getUserInfoResult);
-
-        return getUserInfoRes;
+        return response;
     }
 
-    //更新用户信息
-    public UpdateUserInfoRes updateUserInfoService(String token,String userId,String nickname,String address){
-        UpdateUserInfoRes updateUserInfoRes = new UpdateUserInfoRes();//响应消息
-        X_Authorization x_authorization = new X_Authorization();//接收redis中的value
-
-        //校验昵称地址合法性
-
-        //token有效性验证
-        if(!redisUtils.existsKey(token)){
-            updateUserInfoRes.setCode(ErrorCodes.TOKENDISABLED);
-            updateUserInfoRes.setMsg("token disabled");
-            return updateUserInfoRes;
+    @Override
+    public Response updateUserInfo(UpdateUserInfoBody requestBody, HttpServletRequest request) {
+        logger.debug("updateUserInfo accept request");
+        if (request.getHeader(HeaderFields.authorization) == null) {
+            return new Response(ErrorCode.TOKEN_NULL);
         }
-        //存的id
-        x_authorization= (X_Authorization) redisUtils.get(token);//查出来的是object，无法操作，怎么转成我们需要的类型呢，可强转
-        String userIdInRedis = x_authorization.getUserId();
-        //token正确性验证
-        if(!userId.equals(userIdInRedis)){
-            updateUserInfoRes.setCode(ErrorCodes.TOKENERROR);
-            updateUserInfoRes.setMsg("token erroe");
-            return updateUserInfoRes;
+        //string处理，请求头参数，封装
+        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.authorization));
+        String userId = params[0];
+        String token = params[1];
+        //token有效性正确性
+        logger.debug("updateUserInfo read redis");
+        if (!redisService.existsKey(token)) {
+            return new Response(ErrorCode.TOKEN_DISABLED);
+        }
+        if (!redisService.get(token).getUserId().equals(userId)) {
+            return new Response(ErrorCode.TOKEN_ERROR);
         }
 
-        //写入数据库
-        userMapper.UpdateUserInfoByID(address,nickname,userId);
+        //request信息nickname,address校验，不传则默认是null，null不做处理
+        String nickname = requestBody.getNickname();
+        String address = requestBody.getAddress();
+        logger.debug("updateUserInfo read sql");
+        if (requestBody.getNickname() == null) {
+            nickname = userMapper.getUserById(userId).getNickname();
+        }
+        if (requestBody.getAddress() == null) {
+            address = userMapper.getUserById(userId).getAddress();
+        }
+        logger.debug("updateUserInfo write sql");
+        userMapper.updateUserInfoById(address, nickname, userId);
 
-        //无result
-        //初始化响应消息
-        updateUserInfoRes.setCode(ErrorCodes.SUCCESS);
-        updateUserInfoRes.setMsg("success");
-        updateUserInfoRes.setResult(null);
-
-        return updateUserInfoRes;
+        return new Response(ErrorCode.SUCCESS);
     }
 
-    public ChangePasswordRes changePasswordService(String token,String userId,String oldPassword,String newPassword){
-        ChangePasswordRes changePasswordRes = new ChangePasswordRes();
-
-        X_Authorization x_authorization = new X_Authorization();//接收redis中的value
-
-        //新老密码合法性
-        if(!(CheckUtils.checkpassword(oldPassword))){
-            changePasswordRes.setCode(ErrorCodes.OLDPASSWORDILLEGAL);
-            return changePasswordRes;
+    @Override
+    public Response changePassword(ChangePasswordBody requestBody, HttpServletRequest request) {
+        logger.debug("changePassword accept request");
+        if (request.getHeader(HeaderFields.authorization) == null) {
+            return new Response(ErrorCode.TOKEN_NULL);
         }
-        if(!(CheckUtils.checkpassword(newPassword))){
-            changePasswordRes.setCode(ErrorCodes.NEWPASSWORDILLEGAL);
-            return changePasswordRes;
+        //string 处理
+        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.authorization));
+        String userId = params[0];
+        String token = params[1];
+        //新老密码合法性校验
+        if (!CheckUtils.checkpassword(requestBody.getOldPassword())) {
+            return new Response(ErrorCode.OLDPASSWORD_ILLEGAL);
         }
-
-        //token有效性验证
-        if(!redisUtils.existsKey(token)){
-            changePasswordRes.setCode(ErrorCodes.TOKENDISABLED);
-            changePasswordRes.setMsg("token disabled");
-            return changePasswordRes;
-        }
-        //存的id
-        x_authorization= (X_Authorization) redisUtils.get(token);//查出来的是object，无法操作，怎么转成我们需要的类型呢，可强转
-        String userIdInRedis = x_authorization.getUserId();
-        //token正确性验证
-        if(!userId.equals(userIdInRedis)){
-            changePasswordRes.setCode(ErrorCodes.TOKENERROR);
-            changePasswordRes.setMsg("token erroe");
-            return changePasswordRes;
+        if (!CheckUtils.checkpassword(requestBody.getNewPassword())) {
+            return new Response((ErrorCode.NEWPASSWORD_ILLEGAL));
         }
 
-        //查数据库，密码是否正确
-        if(!oldPassword.equals(userMapper.findPasswordByID(userId))){
-            changePasswordRes.setCode(ErrorCodes.PASSWORDERROR);
-            changePasswordRes.setMsg("oldpassword error");
-            return changePasswordRes;
+        logger.debug("changePassword read redis");
+        if (!redisService.existsKey(token)) {
+            return new Response(ErrorCode.TOKEN_DISABLED);
+        }
+        if (!redisService.get(token).getUserId().equals(userId)) {
+            return new Response(ErrorCode.TOKEN_ERROR);
         }
 
-        //写入新密码
-        userMapper.UpdatePasswordByID(newPassword,userId);
+        //老密码校验正确
+        String encryptedOldPassword;
+        try {
+            encryptedOldPassword = MD5Utils.getMD5Str(requestBody.getOldPassword());
+        } catch (NoSuchAlgorithmException e) {
+            logger.debug("请求加密算法失败，请检查是否存在该算法");
+            return new Response(ErrorCode.SEVER_INTERNAL_ERROR);
+        }
+        logger.debug("changePassword read sql");
+        if (!encryptedOldPassword.equals(userMapper.findPasswordById(userId))) {
+            return new Response(ErrorCode.PASSWORD_ERROR);
+        }
 
-        changePasswordRes.setCode(ErrorCodes.SUCCESS);
-        changePasswordRes.setMsg("success");
-        changePasswordRes.setResult(null);
-        return changePasswordRes;
+        //新密码校验存储
+        String encryptedNewPassword;
+        try {
+            encryptedNewPassword = MD5Utils.getMD5Str(requestBody.getNewPassword());
+        } catch (NoSuchAlgorithmException e) {
+            logger.debug("请求加密算法失败，请检查是否存在该算法");
+            return new Response(ErrorCode.SEVER_INTERNAL_ERROR);
+        }
+
+        logger.debug("changePassword write sql");
+        userMapper.updatePasswordById(encryptedNewPassword, userId);
+
+        return new Response(ErrorCode.SUCCESS);
     }
 
+    /**
+     * token校验
+     */
+    public ErrorCode tokenCheck(String token, String userId) {
+        //token有效性正确性
+        if (!redisService.existsKey(token)) {
+            return ErrorCode.TOKEN_DISABLED;
+        }
+        if (!redisService.get(token).getUserId().equals(userId)) {
+            return ErrorCode.TOKEN_ERROR;
+        }
+
+        return ErrorCode.SUCCESS;
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

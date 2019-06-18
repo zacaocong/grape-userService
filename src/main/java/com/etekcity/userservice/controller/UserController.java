@@ -1,74 +1,57 @@
 package com.etekcity.userservice.controller;
 
-
-import com.etekcity.userservice.request.body.*;
-import com.etekcity.userservice.request.req.RegisterReq;
-import com.etekcity.userservice.response.res.*;
-import com.etekcity.userservice.service.UserService;
-import com.etekcity.userservice.service.UserServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.etekcity.userservice.request.*;
+import com.etekcity.userservice.response.rsp.Response;
+import com.etekcity.userservice.service.UserServiceImpl;
+
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 //@RequestMapping("/api/v1/user")
 public class UserController {
+
     @Autowired
     private UserServiceImpl userService;
 
-    //-----------------------------------test
-    @RequestMapping("/hello")
-    public String hello(){
-        return "helloworld";
-    }//postman崩了、、hello都哈不出来
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
 
+    @RequestMapping(value = "/register",method = RequestMethod.POST)
+    public Response registerControl(@RequestBody RegisterBody requestBody) {
 
-    //-----------------------------------注册
-    /*
-    * {
-        "emali":"example@etekcity.com.cn",
-        "password":"KC=~pwcnJ7"
-        }
-    * */
-    @RequestMapping("/register")
-    public RegisterRes RegisterController(@RequestBody RegisterReq request){
-        return userService.registerService(request.getEmail(),request.getPassword());
-    }//失败的原因是userid是32位加四个-，一共36位，数据库只有32位，所以失败
-    @RequestMapping("/registers")
-    public String RegisterControllers(@RequestBody RegisterReq request){
-        return request.getEmail();
-    }
-    @RequestMapping("/registerp")
-    public String RegisterControllerp(@RequestBody RegisterReq request){
-        return request.getPassword();
+        return userService.register(requestBody);
     }
 
-    //----------------------------------登录
-    @RequestMapping("/login")
-    public LoginRes LoginController(@RequestBody LoginBody request){
-        return userService.loginService(request.getEmail(),request.getPassword());
-    }
-    //----------------------------------登出
-    @RequestMapping("/logout")
-    public LogoutRes LogoutController(@RequestBody LogoutBody request){
-        return userService.logoutService(request.getToken(),request.getUserId());//????
-    }
-    //----------------------------------获取用户信息
-    @RequestMapping("/getuserinfo")
-    public GetUserInfoRes GetUserInfoController(@RequestBody GetUserInfoBody request){
-        return userService.getUserInfoService(request.getToken(),request.getUserId());
-    }
-    //----------------------------------更新用户信息
-    @RequestMapping("/updateuserinfo")
-    public UpdateUserInfoRes UpdateUserInfoConreller(@RequestBody UpdateUserInfoBody request){
-        return userService.updateUserInfoService(request.getToken(),request.getUserId(),request.getNickname(),request.getAddress());
-    }
-    //----------------------------------更新用户密码
-    @RequestMapping("/changepassword")
-    public ChangePasswordRes ChangePasswordController(@RequestBody ChangePasswordBody request){
-        return userService.changePasswordService(request.getToken(),request.getUserId(),request.getOldPassword(),request.getNewPassword());
+    @RequestMapping(value = "/login",method = RequestMethod.POST)
+    public Response loginControl(@RequestBody LoginBody requestBody) {
+        return userService.login(requestBody);
     }
 
+    @RequestMapping(value = "/logout",method = RequestMethod.POST)
+    public Response logoutControl( HttpServletRequest request) {
+        return userService.logout(request);
+    }
+
+    @RequestMapping(value = "/getUserInfo",method = RequestMethod.POST)
+    public Response getUserInfoControl( HttpServletRequest request) {
+        return userService.getUserInfo(request);
+    }
+
+    @RequestMapping(value = "/updateUserInfo",method = RequestMethod.POST)
+    public Response updateUserInfoControl(@RequestBody UpdateUserInfoBody requestBody, HttpServletRequest request) {
+        return userService.updateUserInfo(requestBody,request);
+    }
+
+    @RequestMapping(value = "/changePassword",method = RequestMethod.POST)
+    public Response changePasswordControl(@RequestBody ChangePasswordBody requestBody, HttpServletRequest request) {
+        return userService.changePassword(requestBody,request);
+    }
 
 }

@@ -1,12 +1,10 @@
 package com.etekcity.userservice.response.result;
 
-import java.sql.Timestamp;
-
 public class RegisterResult {
     private String userId;
-    private Timestamp createAt;
+    private String createAt;
 
-    public RegisterResult(String userId, Timestamp createAt){
+    public RegisterResult(String userId, String createAt) {
         this.userId = userId;
         this.createAt = createAt;
     }
@@ -19,11 +17,12 @@ public class RegisterResult {
         this.userId = userId;
     }
 
-    public Timestamp getCreateAt() {
+    public String getCreateAt() {
         return createAt;
     }
 
-    public void setCreateAt(Timestamp createAt) {
+    public void setCreateAt(String createAt) {
         this.createAt = createAt;
     }
+
 }
