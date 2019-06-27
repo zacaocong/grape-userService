@@ -1,0 +1,27 @@
+package com.etekcity.userservice.request;
+
+/**
+ * 修改密码的请求消息体
+ * @author grape
+ * */
+public class ChangePasswordBody {
+    private String oldPassword;
+    private String newPassword;
+
+    public String getOldPassword() {
+        return oldPassword;
+    }
+
+    public void setOldPassword(String oldPassword) {
+        this.oldPassword = oldPassword;
+    }
+
+    public String getNewPassword() {
+        return newPassword;
+    }
+
+    public void setNewPassword(String newPassword) {
+        this.newPassword = newPassword;
+    }
+
+}
