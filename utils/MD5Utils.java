@@ -5,15 +5,17 @@ import java.security.NoSuchAlgorithmException;
 
 /**
  * MD5加密工具
+ *
  * @author grape
- * */
+ */
 public class MD5Utils {
 
     /**
      * 返回传入字符串加密后的值
-     * @param str       传入字符串
+     *
+     * @param str 传入字符串
      * @return String
-     * */
+     */
     public static String getMD5Str(String str) throws NoSuchAlgorithmException {
 
         // 生成一个MD5加密计算摘要

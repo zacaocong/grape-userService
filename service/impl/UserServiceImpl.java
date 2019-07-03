@@ -3,9 +3,12 @@ package com.etekcity.userservice.service.impl;
 import javax.servlet.http.HttpServletRequest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
-import com.etekcity.userservice.redis.entity.AuthorizationValue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,21 +17,27 @@ import com.etekcity.userservice.constant.Const;
 import com.etekcity.userservice.constant.ErrorCode;
 import com.etekcity.userservice.constant.HeaderFields;
 import com.etekcity.userservice.dao.UserMapper;
-import com.etekcity.userservice.entity.User;
+import com.etekcity.userservice.entity.UserInfo;
+import com.etekcity.userservice.modle.User;
+import com.etekcity.userservice.redis.entity.AuthorizationValue;
+import com.etekcity.userservice.redis.entity.UserIdValue;
 import com.etekcity.userservice.redis.impl.RedisServiceImpl;
+import com.etekcity.userservice.request.ChangePasswordBody;
+import com.etekcity.userservice.request.RegisterAndLoginBody;
+import com.etekcity.userservice.request.UpdateUserInfoBody;
+import com.etekcity.userservice.response.result.EmptyResult;
 import com.etekcity.userservice.response.result.GetUserInfoResult;
 import com.etekcity.userservice.response.result.LoginResult;
 import com.etekcity.userservice.response.result.RegisterResult;
 import com.etekcity.userservice.response.rsp.Response;
-import com.etekcity.userservice.utils.*;
-import com.etekcity.userservice.response.result.EmptyResult;
-import com.etekcity.userservice.entity.UserInfo;
 import com.etekcity.userservice.service.UserService;
-import com.etekcity.userservice.request.*;
+import com.etekcity.userservice.utils.*;
+
 /**
  * UserService实现
+ *
  * @author grape
- * */
+ */
 
 @Service
 @Slf4j
@@ -37,127 +46,202 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private UserMapper userMapper;
     @Autowired
-    private RedisServiceImpl<AuthorizationValue> redisService;
-
-    private String userId;
-    private String token;
-    private String email;
-
-    private static Response<EmptyResult> response = new Response<>();
-
-    static  {
-        response.setResult(new EmptyResult());
-    }
-
+    private RedisServiceImpl<AuthorizationValue> authorizationValueRedisService;
+    @Autowired
+    private RedisServiceImpl<TreeSet<UserIdValue>> userIdValueRedisService;
 
     @Override
     public Response register(RegisterAndLoginBody requestBody) {
-        log.info("Now method    : {}",">>>>>>>>>register");
-        log.info("register      : {}:{}","get the requestBody",requestBody);
+        //空体响应，方法体内保证线程安全
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
 
-        email = requestBody.getEmail();
-        log.info("register      : email:{}",email);
+        //接收参数
+        String email = requestBody.getEmail();
 
+        //成功响应消息体
         Response responseSuccess = new Response(ErrorCode.SUCCESS);
-        log.info("register      : {}:{}","create the success response",responseSuccess);
-        userId = UUIDUtils.getUUID32();
-        log.info("register      : {}:{}","create the UUID",userId);
 
+        //生成响应结果
+        String userId = UUIDUtils.getUUID32();
         //存入时间和打印时间差了8小时，这应该是timezone导致的,UTC改为CTT显示正常
         Date now = new Date();
         SimpleDateFormat ft = new SimpleDateFormat(Const.TIMEPATTERN);
         String formatCreateAt = ft.format(now);
-        log.info("register      : {}:{}","created the format time",formatCreateAt);
-
-        //todo:1、怎么去？ 2、log中的重复字符串？ 3、try catch加密校验，写入可以在service里做，但是校验应该在切面里，能不能封装出一个方法
         responseSuccess.setResult(new RegisterResult(userId, formatCreateAt));
 
-        //加密
+        //加密：
         String encryptedPassword;
         try {
             encryptedPassword = MD5Utils.getMD5Str(requestBody.getPassword());
-            log.info("register      : {}:{}","created the encryptedPassword",encryptedPassword);
         } catch (NoSuchAlgorithmException e) {
-            log.debug("请求加密算法失败，请检查是否存在该算法");
+            log.error("请求加密算法失败，请检查是否存在该算法", e);
             response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
             return response;
         }
-        //写入
-        log.info("register      : {}","write in database");
-        log.info("register      : userId:{},email:{},encryptedPassword:{},createAt:{},updateAt:{}",userId,email,
-                encryptedPassword,now,now);
-        userMapper.insert(userId, email, encryptedPassword, now, now);
 
-        log.info("register      : {}",">>>>>>>>>>register return");
+        //数据库：写入
+        try {
+            userMapper.insert(userId, email, encryptedPassword, now, now);
+        } catch (Exception e) {
+            log.error("数据库操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
         return responseSuccess;
     }
 
     @Override
     public Response login(RegisterAndLoginBody requestBody) {
-        log.info("Now method    : {}",">>>>>>>>>>login");
-        log.info("login         : {}:{}","get the requestBody",requestBody);
+        //空体响应
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
 
-        email = requestBody.getEmail();
-        log.info("login         : email:{}",email);
+        //接收参数
+        String email = requestBody.getEmail();
 
-        User user = userMapper.getUserByEmail(email);
+        //数据库：读取信息
+        User user;
+        try {
+            user = userMapper.getUserByEmail(email);
+        } catch (Exception e) {
+            log.error("数据库操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
 
+        //生成redis数据
+        String token = TokenUtils.getUUToken();
+        String userId = user.getUserId();
+        //userId：token
+        String authorization = StringUtils.formatCreateKey(userId, token);
+        //当前时间
+        Date createTokenAt = new Date();
+        //生成校验value
+        AuthorizationValue authorizationValue = new AuthorizationValue(userId, createTokenAt);
+
+        try {
+            //判断是否有userId
+            TreeSet<UserIdValue> uSet;
+            if (!userIdValueRedisService.existsKey(userId)) {
+                uSet = new TreeSet<>();
+            } else {
+                //get 获取该用户所有token信息
+                uSet = userIdValueRedisService.get(userId);
+                //更新过期token ,将uSet中过期的token删除掉
+                updateToken(uSet, createTokenAt);
+            }
+            //处理uSet：加入本次新生成token，
+            UserIdValue userIdValue = new UserIdValue(authorization, createTokenAt);
+            uSet.add(userIdValue);
+            //加入后不能超过5个token，超过就删除老的
+            while (uSet.size() > Const.TOKENMAX) {
+                authorizationValueRedisService.deleteKey(uSet.first().getAuthorization());
+                uSet.remove(uSet.first());
+            }
+            //写入
+            authorizationValueRedisService.set(authorization, authorizationValue, Const.EXPIRETIME);
+            userIdValueRedisService.getAndSetAddUpdateAt(userId, uSet, Const.EXPIRETIME + Const.ZONE);
+        } catch (Exception e) {
+            log.error("redis操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
+        //生成成功响应消息
         Response responseSuccess = new Response(ErrorCode.SUCCESS);
-        log.info("login         : {}:{}","create the success response",responseSuccess);
-        token = TokenUtils.getUUToken();
-        log.info("login         : {}:{}","create the token",token);
-
-        AuthorizationValue authorization = new AuthorizationValue(user.getUserId(), token);
-        log.info("login         : {}","create the redis value");
-        redisService.set(token, authorization, Const.EXPIRETIME);
-        log.info("login         : {}","write in redis");
-
+        //生成响应结果
         SimpleDateFormat ft = new SimpleDateFormat(Const.TIMEPATTERN);
         LoginResult loginResult = new LoginResult(token, user.getUserId(), user.getNickname(),
                 user.getAddress(), user.getEmail(), ft.format(user.getCreateAt()), ft.format(user.getUpdateAt()),
                 Const.EXPIRETIME);
-        log.info("login         : {}","create the result");
-        //todo:
+
         responseSuccess.setResult(loginResult);
 
-        log.info("login         : {}",">>>>>>>>>>>login return");
         return responseSuccess;
     }
 
     @Override
     public Response logout(HttpServletRequest request) {
-        log.info("Now method    : {}",">>>>>>>>>>logout");
-        log.info("logout        : {}:{}","get the request",request);
+        //空体响应
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
 
-        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
-        userId = params[0];
-        token = params[1];
-        log.info("logout        : userId:{},token:{}",userId,token);
+        //接收参数
+        //获取并格式化为userId：token
+        String authorization = request.getHeader(HeaderFields.AUTHORIZATION);
+        authorization = StringUtils.formatCreateKey(authorization);
+        //获取userId
+        String[] params = StringUtils.splitStringsByColon(authorization);
+        String userId = params[0];
 
-        log.info("logout        : {}","delete the token , write the redis");
-        redisService.deleteKey(token);
+        Date now = new Date();
 
-        log.info("logout        : {}",">>>>>>>>>>>logout return");
+        //redis：删除token
+        try {
+            //get
+            TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
+            //处理，遍历删除该authorization的value
+            Iterator<UserIdValue> it = uSet.iterator();
+            while (it.hasNext()) {
+                if (it.next().getAuthorization().equals(authorization)) {
+                    it.remove();
+                }
+            }
+            authorizationValueRedisService.deleteKey(authorization);
+            //更新删除过期token
+            updateToken(uSet, now);
+            //get and set
+            if (uSet.isEmpty()) {
+                userIdValueRedisService.deleteKey(userId);
+            } else {
+                Long expire = authorizationValueRedisService.getKeyExpire(uSet.last().getAuthorization(),
+                        TimeUnit.SECONDS);
+                userIdValueRedisService.getAndSetAddUpdateAt(userId, uSet, expire + Const.ZONE);
+            }
+        } catch (Exception e) {
+            log.error("redis操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
         return response;
     }
 
     @Override
     public Response getUserInfo(HttpServletRequest request) {
-        log.info("Now method    : {}",">>>>>>>>>>getUserInfo");
-        log.info("getUserInfo   : {}:{}","get the request",request);
+        //空体响应
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
 
+        //接收参数
         String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
-        userId = params[0];
-        log.info("getUserInfo   : userId:{}",userId);
+        String userId = params[0];
 
+        //成功响应消息体
         Response responseSuccess = new Response(ErrorCode.SUCCESS);
-        log.info("getUserInfo   : {}:{}","create the success response",responseSuccess);
 
         SimpleDateFormat ft = new SimpleDateFormat(Const.TIMEPATTERN);
+        //数据库：获取用户信息
+        UserInfo userInfo;
+        try {
+            userInfo = userMapper.getUserInfoById(userId);
+        } catch (Exception e) {
+            log.error("数据库操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
 
-        log.info("getUserInfo   : {}","read the database get userInfo by userId");
-        UserInfo userInfo = userMapper.getUserInfoById(userId);
+        try {
+            updateToken(userId);
+        } catch (Exception e) {
+            log.error("自动更新失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
 
+        //生成响应结果
         GetUserInfoResult getUserInfoResult = new GetUserInfoResult(
                 userInfo.getUserId(),
                 userInfo.getEmail(),
@@ -166,77 +250,147 @@ public class UserServiceImpl implements UserService {
                 ft.format(userInfo.getCreateAt()),
                 ft.format(userInfo.getUpdateAt())
         );
-        log.info("getUserInfo   : {}:{}","create the result",getUserInfoResult);
 
         responseSuccess.setResult(getUserInfoResult);
 
-        log.info("getUserInfo   : {}",">>>>>>>>>>>getUserInfo return");
         return responseSuccess;
     }
 
     @Override
-    public Response updateUserInfo(HttpServletRequest request,UpdateUserInfoBody requestBody) {
-        log.info("Now method    : {}",">>>>>>>>>>updateUserInfo");
-        log.info("updateUserInfo: {}:{}","get the request",request);
+    public Response updateUserInfo(HttpServletRequest request, UpdateUserInfoBody requestBody) {
+        //空体响应
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
 
         //string处理，请求头参数，获取userId
         String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
-        userId = params[0];
-        log.info("updateUserInfo: userId:{}",userId);
-
+        String userId = params[0];
         //request信息nickname,address校验，不传则默认是null，null不做处理
         String nickname = requestBody.getNickname();
         String address = requestBody.getAddress();
-        log.info("updateUserInfo: nickname:{},address:{}", nickname,address);
 
         //更新时间
         Date now = new Date();
 
-        //昵称地址校验写入
-        log.info("updateUserInfo: {}","write nickname and address in database");
-        if (nickname != null && CheckUtils.checkNickname(nickname)) {
-            userMapper.updateNicknamById(nickname,now,userId);
-        }
-        if (address != null && CheckUtils.checkNickname(address)) {
-            userMapper.updateAddressById(address,now,userId);
-        }
-
-        log.info("updateUserInfo: {}",">>>>>>>>>>>updateUserInfo return");
-        return response;
-    }
-
-    @Override
-    public Response changePassword(HttpServletRequest request,ChangePasswordBody requestBody) {
-        log.info("Now method    : {}",">>>>>>>>>>changePassword");
-        log.info("changePassword: {}:{}","get the request",request);
-
-        String oldPassword = requestBody.getOldPassword();
-        String newPassword = requestBody.getNewPassword();
-        log.info("changePassword: oldPassword:{},newPassword:{}",oldPassword,newPassword);
-
-        //string 处理,userId还会用，token删了吧
-        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
-        userId = params[0];
-        log.info("changePassword: userId:{}",userId);
-
-        log.info("changePassword: {}","encrypt the new password");
-        //新密码加密存储
-        String encryptedNewPassword;
         try {
-            encryptedNewPassword = MD5Utils.getMD5Str(newPassword);
-            log.info("changePassword: encryptedNewPassword:{}",encryptedNewPassword);
-        } catch (NoSuchAlgorithmException e) {
-            log.error("请求加密算法失败，请检查是否存在该算法");
+            updateToken(userId);
+        } catch (Exception e) {
+            log.error("自动更新失败", e);
             response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
             return response;
         }
 
-        log.info("changePassword: {}","write the newPassword in database");
-        Date now = new Date();
-        userMapper.updatePasswordById(encryptedNewPassword,now,userId);
+        //数据库：昵称地址校验，写入数据库
+        try {
+            if (nickname != null && CheckUtils.checkNickname(nickname)) {
+                userMapper.updateNicknameById(nickname, now, userId);
+            }
+            if (address != null && CheckUtils.checkNickname(address)) {
+                userMapper.updateAddressById(address, now, userId);
+            }
+        } catch (Exception e) {
+            log.error("数据库操作失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
 
-        log.info("changePassword: {}",">>>>>>>>>>>changePassword return");
         return response;
+    }
+
+    @Override
+    public Response changePassword(HttpServletRequest request, ChangePasswordBody requestBody) {
+        //空体响应
+        Response<EmptyResult> response = new Response<>();
+        response.setResult(new EmptyResult());
+
+        //获取新老密码
+        String oldPassword = requestBody.getOldPassword();
+        String newPassword = requestBody.getNewPassword();
+
+        //新老密码合法性
+        if (oldPassword == null || !CheckUtils.checkPassword(oldPassword)) {
+            response.setCodeAndMsgByEnum(ErrorCode.OLDPASSWORD_ILLEGAL);
+            return response;
+        }
+        if (newPassword == null || !CheckUtils.checkPassword(newPassword)) {
+            response.setCodeAndMsgByEnum(ErrorCode.NEWPASSWORD_ILLEGAL);
+            return response;
+        }
+
+        String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
+        String userId = params[0];
+
+        //加密：获得暗文密码
+        String encryptedOldPassword;
+        String encryptedNewPassword;
+
+        try {
+            encryptedOldPassword = MD5Utils.getMD5Str(oldPassword);
+            encryptedNewPassword = MD5Utils.getMD5Str(newPassword);
+        } catch (NoSuchAlgorithmException e) {
+            log.error("请求加密算法失败，请检查是否存在该算法", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
+        //数据库：老密码校验，正确，新密码写入数据库
+        try {
+            if (!encryptedOldPassword.equals(userMapper.findPasswordById(userId))) {
+                //密码错误
+                log.info("oldPassword is error");
+                response.setCodeAndMsgByEnum(ErrorCode.PASSWORD_ERROR);
+                return response;
+            }
+            //更新密码
+            Date now = new Date();
+            userMapper.updatePasswordById(encryptedNewPassword, now, userId);
+        } catch (Exception e) {
+            log.error("操作数据库失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
+        try {
+            //get
+            TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
+            //处理，遍历删除对应的Authorization
+            Iterator<UserIdValue> it = uSet.iterator();
+            while (it.hasNext()) {
+                authorizationValueRedisService.deleteKey(it.next().getAuthorization());
+            }
+            userIdValueRedisService.deleteKey(userId);
+        } catch (Exception e) {
+            log.error("操作redis失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
+        return response;
+    }
+
+
+    /**
+     * 每次拿到userId都可以在服务器内部自动更新一次token
+     */
+    private void updateToken(TreeSet<UserIdValue> uSet, Date createTokenAt) {
+        //------------------更新过期token
+        //计算当前时间所对应的过期时间:1、获取一个日历2、使用给定的date设置日历3、add4、日历getTime赋值给date
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(createTokenAt);
+        calendar.add(Calendar.SECOND, Const.SUBEXPIRETIME);
+        Date expireDate = calendar.getTime();
+        //最早的比目前早过期,全删,这里没用itr遍历，应该没问题
+        while (uSet.first().getCreateAt().before(expireDate) && !uSet.isEmpty()) {
+            uSet.remove(uSet.first());
+        }
+    }
+
+    private void updateToken(String userId) {
+        TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
+        updateToken(uSet, new Date());
+        if (uSet.isEmpty()) {
+            userIdValueRedisService.deleteKey(userId);
+        }
     }
 
 }

@@ -1,16 +1,17 @@
-package com.etekcity.userservice.entity;
+package com.etekcity.userservice.modle;
 
 import java.util.Date;
 
 /**
  * User用户类，存储用户相关属性，与数据库中user_info对应
+ *
  * @author grape
  * @since 0.0.1
- * */
+ */
 public class User {
     /**
      * 数据库（user_id, email password address nickname create_at,update_at）
-     * */
+     */
     private String userId;
     private String email;
     private String password;

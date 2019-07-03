@@ -14,15 +14,16 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
  * 项目启动加载redis
+ *
  * @author 作者：grape
  * @version 创建时间：2019年6月7日 下午5:56:41
- * */
+ */
 @Configuration
 @EnableCaching
 public class RedisConfiguration extends CachingConfigurerSupport {
     /**
      * 这里声明V即可，前面声明String V会把String变成泛型，
-     * */
+     */
     @Bean
     public <V> RedisTemplate<String, V> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, V> template = new RedisTemplate<>();
@@ -36,7 +37,7 @@ public class RedisConfiguration extends CachingConfigurerSupport {
         //key的序列化器为String
         StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
         //value的序列化为json格式，使用Jackson2JsonRedisSerializer
-        @SuppressWarnings({"rawtypes","unchecked"})
+        @SuppressWarnings({"rawtypes", "unchecked"})
         Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new
                 Jackson2JsonRedisSerializer<Object>(Object.class);
         //jackson核心对象，Jackson是用来转换json和java格式的

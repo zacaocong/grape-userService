@@ -2,6 +2,7 @@ package com.etekcity.userservice.response.result;
 
 /**
  * 注册响应结果
+ *
  * @author grape
  */
 public class RegisterResult {

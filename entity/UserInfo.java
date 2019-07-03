@@ -4,9 +4,10 @@ import java.util.Date;
 
 /**
  * UserInfo用户信息
+ *
  * @author grape
  * @since 0.0.1
- * */
+ */
 public class UserInfo {
     private String userId;
     private String email;

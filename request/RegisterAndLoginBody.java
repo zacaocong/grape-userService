@@ -3,7 +3,9 @@ package com.etekcity.userservice.request;
 /**
  * 邮箱密码
  * 登录注册都用同一请求体
- * */
+ *
+ * @author grape
+ */
 public class RegisterAndLoginBody {
     private String email;
     private String password;

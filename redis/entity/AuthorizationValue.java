@@ -1,22 +1,27 @@
 package com.etekcity.userservice.redis.entity;
 
+import java.util.Date;
+
 /**
- * 用户权限，封装token和userId，作为redis键值对中的值
+ * key： userId token
+ * value 创建时间  userId
+ *
  * @author grape
- * */
+ * 在redis中第一个简单查询结构中  key：userId token  value：authorizationValue（userId， createAt）此处userId便于查询
+ * 在redis第二个结构中            key：userId        value：TreeSet<UserIdValue>   (authorization,Date) 便于查上表
+ */
 public class AuthorizationValue {
-
+    /**
+     * userId 便于查询
+     */
     private String userId;
-    private String token;
-    private Integer count;
+    /**
+     * userId token的创建时间
+     */
+    private Date createTokenTime;
 
-    public AuthorizationValue(){
+    public AuthorizationValue() {
 
-    }
-
-    public AuthorizationValue(String userId, String token) {
-        this.userId = userId;
-        this.token = token;
     }
 
     public String getUserId() {
@@ -27,25 +32,16 @@ public class AuthorizationValue {
         this.userId = userId;
     }
 
-    public String getToken() {
-        return token;
+    public Date getCreateTokenTime() {
+        return createTokenTime;
     }
 
-    public void setToken(String token) {
-        this.token = token;
+    public void setCreateTokenTime(Date createTokenTime) {
+        this.createTokenTime = createTokenTime;
     }
 
-    public Integer getCount() {
-        return count;
+    public AuthorizationValue(String userId, Date createTokenTime) {
+        this.userId = userId;
+        this.createTokenTime = createTokenTime;
     }
-
-    public void setCount(Integer count) {
-        this.count = count;
-    }
-
-    @Override
-    public String toString() {
-        return "AuthorizationValue:{" + "token:" + token + "userID:" + userId + "}";
-    }
-
 }

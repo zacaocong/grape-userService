@@ -2,8 +2,9 @@ package com.etekcity.userservice.response.result;
 
 /**
  * 登录响应结果
+ *
  * @author grape
- * */
+ */
 public class LoginResult {
     private String token;
     private String userId;
@@ -14,23 +15,24 @@ public class LoginResult {
     private String updateAt;
     private Long expiresIn;
 
-    public LoginResult(){
+    public LoginResult() {
 
     }
 
     /**
      * 传参构造方法
-     * @param token         token
-     * @param userId        userId
-     * @param nickname      nickname
-     * @param address       address
-     * @param email         email
-     * @param createAt      createAt
-     * @param updateAt      updateAt
-     * @param expiresIn     expiresIn
-     * */
+     *
+     * @param token     token
+     * @param userId    userId
+     * @param nickname  nickname
+     * @param address   address
+     * @param email     email
+     * @param createAt  createAt
+     * @param updateAt  updateAt
+     * @param expiresIn expiresIn
+     */
     public LoginResult(String token, String userId, String nickname, String address, String email,
-                   String createAt, String updateAt, Long expiresIn) {
+                       String createAt, String updateAt, Long expiresIn) {
         this.token = token;
         this.userId = userId;
         this.nickname = nickname;

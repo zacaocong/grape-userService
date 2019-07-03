@@ -2,8 +2,9 @@ package com.etekcity.userservice.response.result;
 
 /**
  * 获取用户信息响应消息的结果
+ *
  * @author grape
- * */
+ */
 public class GetUserInfoResult {
     private String userId;
     private String email;
@@ -12,19 +13,20 @@ public class GetUserInfoResult {
     private String createAt;
     private String updateAt;
 
-    public GetUserInfoResult(){
+    public GetUserInfoResult() {
 
     }
 
     /**
      * 传参构造方法
-     * @param userId        userId
-     * @param email         email
-     * @param nickname      nickname
-     * @param address       address
-     * @param createAt      createAt
-     * @param updateAt      updateAt
-     * */
+     *
+     * @param userId   userId
+     * @param email    email
+     * @param nickname nickname
+     * @param address  address
+     * @param createAt createAt
+     * @param updateAt updateAt
+     */
     public GetUserInfoResult(String userId, String email, String nickname, String address,
                              String createAt, String updateAt) {
         this.userId = userId;

@@ -4,29 +4,27 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import com.etekcity.userservice.constant.ErrorCode;
 
-
 /**
  * 相应消息统一格式
+ *
  * @author grape
- * */
-@JsonAutoDetect(fieldVisibility=JsonAutoDetect.Visibility.NONE)
+ */
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class Response<R> {
     private Integer code = ErrorCode.SUCCESS.getCode();
     private String msg = ErrorCode.SUCCESS.getMsg();
-//    private Object result = new EmptyResult();
     private R result;
-    //todo:这里用泛型,不能用Object
 
     /**
      * 无参构造
-     * */
+     */
     public Response() {
 
     }
 
     /**
      * 传参构造
-     * */
+     */
     public Response(Integer code, String msg) {
         this.code = code;
         this.msg = msg;
@@ -34,7 +32,7 @@ public class Response<R> {
 
     /**
      * 枚举构造
-     * */
+     */
     public Response(ErrorCode errorCode) {
         this.code = errorCode.getCode();
         this.msg = errorCode.getMsg();
@@ -42,7 +40,7 @@ public class Response<R> {
 
     /**
      * 构造方法
-     * */
+     */
     public Response(Integer code, String msg, R result) {
         this.code = code;
         this.msg = msg;
@@ -65,10 +63,6 @@ public class Response<R> {
         this.msg = msg;
     }
 
-
-/**
- * 这里get返回值没改，导致取不到响应
- * */
     public R getResult() {
         return result;
     }
@@ -79,7 +73,7 @@ public class Response<R> {
 
     /**
      * 枚举set
-     * */
+     */
     public void setCodeAndMsgByEnum(ErrorCode errorCode) {
         this.code = errorCode.getCode();
         this.msg = errorCode.getMsg();

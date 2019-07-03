@@ -2,8 +2,9 @@ package com.etekcity.userservice.request;
 
 /**
  * 修改密码的请求消息体
+ *
  * @author grape
- * */
+ */
 public class ChangePasswordBody {
     private String oldPassword;
     private String newPassword;
