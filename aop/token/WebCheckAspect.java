@@ -2,6 +2,7 @@ package com.etekcity.userservice.aop.token;
 
 import javax.servlet.http.HttpServletRequest;
 
+import com.etekcity.userservice.redis.entity.TokenValue;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -35,8 +36,9 @@ public class WebCheckAspect {
 
     @Autowired
     private UserMapper userMapper;
+
     @Autowired
-    private RedisServiceImpl<AuthorizationValue> authorizationValueRedisService;
+    private RedisServiceImpl<TokenValue> tokenValueRedisService;
 
     /**
      * 定义切点为service包下所有方法
@@ -158,16 +160,22 @@ public class WebCheckAspect {
             response.setCodeAndMsgByEnum(ErrorCode.TOKEN_ILLEGAL);
             return response;
         }
-        //格式化userId：token
-        authorization = StringUtils.formatCreateKey(authorization);
+        //authorization为合法参数，获取userId和token
+        String[] params = StringUtils.splitStrings(authorization);
+        String userId = params[0];
+        String token = params[1];
 
         //token验证，有效，且正确
         log.info("check token, read redis");
 
         //读redis，是否存在该userId:token
         try {
-            if (!authorizationValueRedisService.existsKey(authorization)) {
+            if (!tokenValueRedisService.existsKey(token)) {
                 response.setCodeAndMsgByEnum(ErrorCode.TOKEN_DISABLED);
+                return response;
+            }
+            if (!tokenValueRedisService.get(token).getUserId().equals(userId)) {
+                response.setCodeAndMsgByEnum(ErrorCode.TOKEN_ERROR);
                 return response;
             }
         } catch (Exception e) {

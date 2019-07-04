@@ -15,18 +15,33 @@ public class UserIdValue implements Comparable<UserIdValue> {
      * userId token
      * createAt
      */
-    private String authorization;
+//    private String authorization;
+
+    /**
+     * token 该用户的token，此处无法保证一定有效，但由于存储了生成时间，在知道生存周期的情况下可以手动更新
+     * */
+    private String token;
+
     /**
      * Date可以转Calendar可以操作，比较before after
      */
     private Date createAt;
 
-    public String getAuthorization() {
-        return authorization;
+
+//    public String getAuthorization() {
+//        return authorization;
+//    }
+//
+//    public void setAuthorization(String authorization) {
+//        this.authorization = authorization;
+//    }
+
+    public String getToken() {
+        return token;
     }
 
-    public void setAuthorization(String authorization) {
-        this.authorization = authorization;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public Date getCreateAt() {
@@ -37,19 +52,22 @@ public class UserIdValue implements Comparable<UserIdValue> {
         this.createAt = createAt;
     }
 
+
+    /**
+     * 反序列化需要一个空的构造函数
+     * */
     public UserIdValue() {
 
     }
 
-    public UserIdValue(String authorization, Date createAt) {
-        this.authorization = authorization;
+    public UserIdValue(String token, Date createAt) {
+        this.token = token;
         this.createAt = createAt;
     }
 
     @Override
     public int compareTo(UserIdValue o) {
-        //date也有compareto,这里顺序还不确定
-        //todo：不确定顺序
+        //date也有compareto,这里顺序还不确定，就是由早到晚
         return createAt.compareTo(o.getCreateAt());
     }
 }

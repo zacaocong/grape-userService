@@ -32,6 +32,7 @@ import com.etekcity.userservice.response.result.RegisterResult;
 import com.etekcity.userservice.response.rsp.Response;
 import com.etekcity.userservice.service.UserService;
 import com.etekcity.userservice.utils.*;
+import com.etekcity.userservice.redis.entity.TokenValue;
 
 /**
  * UserService实现
@@ -45,8 +46,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private UserMapper userMapper;
+
     @Autowired
-    private RedisServiceImpl<AuthorizationValue> authorizationValueRedisService;
+    private RedisServiceImpl<TokenValue> tokenValueRedisService;
     @Autowired
     private RedisServiceImpl<TreeSet<UserIdValue>> userIdValueRedisService;
 
@@ -114,13 +116,11 @@ public class UserServiceImpl implements UserService {
         //生成redis数据
         String token = TokenUtils.getUUToken();
         String userId = user.getUserId();
-        //userId：token
-        String authorization = StringUtils.formatCreateKey(userId, token);
+
         //当前时间
         Date createTokenAt = new Date();
-        //生成校验value
-        AuthorizationValue authorizationValue = new AuthorizationValue(userId, createTokenAt);
-
+        //生成校验value，用tokenvalue
+        TokenValue tokenValue = new TokenValue(userId,createTokenAt);
         try {
             //判断是否有userId
             TreeSet<UserIdValue> uSet;
@@ -129,19 +129,19 @@ public class UserServiceImpl implements UserService {
             } else {
                 //get 获取该用户所有token信息
                 uSet = userIdValueRedisService.get(userId);
-                //更新过期token ,将uSet中过期的token删除掉
+                //更新过期token ,将uSet中过期的token删除掉，传人uSet即该用户的token表和当前时间
                 updateToken(uSet, createTokenAt);
             }
             //处理uSet：加入本次新生成token，
-            UserIdValue userIdValue = new UserIdValue(authorization, createTokenAt);
+            UserIdValue userIdValue = new UserIdValue(token, createTokenAt);
             uSet.add(userIdValue);
             //加入后不能超过5个token，超过就删除老的
             while (uSet.size() > Const.TOKENMAX) {
-                authorizationValueRedisService.deleteKey(uSet.first().getAuthorization());
+                tokenValueRedisService.deleteKey(uSet.first().getToken());
                 uSet.remove(uSet.first());
             }
             //写入
-            authorizationValueRedisService.set(authorization, authorizationValue, Const.EXPIRETIME);
+            tokenValueRedisService.set(token, tokenValue, Const.EXPIRETIME);
             userIdValueRedisService.getAndSetAddUpdateAt(userId, uSet, Const.EXPIRETIME + Const.ZONE);
         } catch (Exception e) {
             log.error("redis操作失败", e);
@@ -169,12 +169,11 @@ public class UserServiceImpl implements UserService {
         response.setResult(new EmptyResult());
 
         //接收参数
-        //获取并格式化为userId：token
         String authorization = request.getHeader(HeaderFields.AUTHORIZATION);
-        authorization = StringUtils.formatCreateKey(authorization);
         //获取userId
-        String[] params = StringUtils.splitStringsByColon(authorization);
+        String[] params = StringUtils.splitStrings(authorization);
         String userId = params[0];
+        String token = params[1];
 
         Date now = new Date();
 
@@ -182,22 +181,23 @@ public class UserServiceImpl implements UserService {
         try {
             //get
             TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
-            //处理，遍历删除该authorization的value
+            //处理，遍历token表，删除该token
             Iterator<UserIdValue> it = uSet.iterator();
             while (it.hasNext()) {
-                if (it.next().getAuthorization().equals(authorization)) {
+                if (it.next().getToken().equals(token)) {
                     it.remove();
+                    break;
                 }
             }
-            authorizationValueRedisService.deleteKey(authorization);
+            //再删除校验token键值对
+            tokenValueRedisService.deleteKey(token);
             //更新删除过期token
             updateToken(uSet, now);
-            //get and set
+            //删除该token与过期token后，空则删，不空则更新userId时间为最后加入token的过期时间+一个常量
             if (uSet.isEmpty()) {
                 userIdValueRedisService.deleteKey(userId);
             } else {
-                Long expire = authorizationValueRedisService.getKeyExpire(uSet.last().getAuthorization(),
-                        TimeUnit.SECONDS);
+                Long expire = tokenValueRedisService.getKeyExpire(uSet.last().getToken(),TimeUnit.SECONDS);
                 userIdValueRedisService.getAndSetAddUpdateAt(userId, uSet, expire + Const.ZONE);
             }
         } catch (Exception e) {
@@ -219,6 +219,16 @@ public class UserServiceImpl implements UserService {
         String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
         String userId = params[0];
 
+        //更新该用户token表中过期token
+        try {
+            //自动更新，空则删
+            updateToken(userId);
+        } catch (Exception e) {
+            log.error("自动更新失败", e);
+            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
+            return response;
+        }
+
         //成功响应消息体
         Response responseSuccess = new Response(ErrorCode.SUCCESS);
 
@@ -229,14 +239,6 @@ public class UserServiceImpl implements UserService {
             userInfo = userMapper.getUserInfoById(userId);
         } catch (Exception e) {
             log.error("数据库操作失败", e);
-            response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
-            return response;
-        }
-
-        try {
-            updateToken(userId);
-        } catch (Exception e) {
-            log.error("自动更新失败", e);
             response.setCodeAndMsgByEnum(ErrorCode.SEVER_INTERNAL_ERROR);
             return response;
         }
@@ -265,13 +267,13 @@ public class UserServiceImpl implements UserService {
         //string处理，请求头参数，获取userId
         String[] params = StringUtils.splitStrings(request.getHeader(HeaderFields.AUTHORIZATION));
         String userId = params[0];
+
         //request信息nickname,address校验，不传则默认是null，null不做处理
         String nickname = requestBody.getNickname();
         String address = requestBody.getAddress();
 
-        //更新时间
-        Date now = new Date();
-
+        //todo：还是冗余
+        //更新该用户token表中过期token
         try {
             updateToken(userId);
         } catch (Exception e) {
@@ -280,13 +282,26 @@ public class UserServiceImpl implements UserService {
             return response;
         }
 
+        //更新时间
+        Date now = new Date();
+
         //数据库：昵称地址校验，写入数据库
         try {
-            if (nickname != null && CheckUtils.checkNickname(nickname)) {
-                userMapper.updateNicknameById(nickname, now, userId);
+            if (nickname != null) {
+                if (CheckUtils.checkNickname(nickname)) {
+                    userMapper.updateNicknameById(nickname, now, userId);
+                } else {
+                    response.setCodeAndMsgByEnum(ErrorCode.NICKNAME_ILLEGAL);
+                    return response;
+                }
             }
-            if (address != null && CheckUtils.checkNickname(address)) {
-                userMapper.updateAddressById(address, now, userId);
+            if (address != null) {
+                if (CheckUtils.checkNickname(address)) {
+                    userMapper.updateAddressById(address, now, userId);
+                } else {
+                    response.setCodeAndMsgByEnum(ErrorCode.ADDRESS_ILLEGAL);
+                    return response;
+                }
             }
         } catch (Exception e) {
             log.error("数据库操作失败", e);
@@ -353,11 +368,12 @@ public class UserServiceImpl implements UserService {
         try {
             //get
             TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
-            //处理，遍历删除对应的Authorization
+            //处理，遍历删除对应的校验token键值对
             Iterator<UserIdValue> it = uSet.iterator();
             while (it.hasNext()) {
-                authorizationValueRedisService.deleteKey(it.next().getAuthorization());
+                tokenValueRedisService.deleteKey(it.next().getToken());
             }
+            //删除该用户原有token表
             userIdValueRedisService.deleteKey(userId);
         } catch (Exception e) {
             log.error("操作redis失败", e);
@@ -370,7 +386,8 @@ public class UserServiceImpl implements UserService {
 
 
     /**
-     * 每次拿到userId都可以在服务器内部自动更新一次token
+     * 接收一个treeSet，服务器内部自动更新一次token,treeSet为空也保留，
+     * 此处主要用来在登陆前更新，为空也会加入元素
      */
     private void updateToken(TreeSet<UserIdValue> uSet, Date createTokenAt) {
         //------------------更新过期token
@@ -385,6 +402,10 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /**
+     * 每次拿到userId都可以在服务器内部自动更新一次token,tree为空则删掉
+     * 操作时自动更新，没了就删掉，其实不删也无所谓，因为我设置只多几秒就过期
+     * */
     private void updateToken(String userId) {
         TreeSet<UserIdValue> uSet = userIdValueRedisService.get(userId);
         updateToken(uSet, new Date());
