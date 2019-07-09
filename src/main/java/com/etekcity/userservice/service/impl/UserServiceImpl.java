@@ -10,7 +10,6 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import com.etekcity.userservice.request.*;
-import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
