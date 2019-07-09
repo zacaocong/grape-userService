@@ -1,5 +1,6 @@
 package com.etekcity.userservice.response.rsp;
 
+import com.etekcity.userservice.response.result.EmptyResult;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import com.etekcity.userservice.constant.ErrorCode;
@@ -11,8 +12,8 @@ import com.etekcity.userservice.constant.ErrorCode;
  */
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class Response<R> {
-    private Integer code = ErrorCode.SUCCESS.getCode();
-    private String msg = ErrorCode.SUCCESS.getMsg();
+    private Integer code;
+    private String msg;
     private R result;
 
     /**
@@ -39,11 +40,17 @@ public class Response<R> {
     }
 
     /**
+     * 构造空result响应
+     * */
+    public static Response<EmptyResult> emptyResp(ErrorCode errorCode) {
+        return new Response<>(errorCode, new EmptyResult());
+    }
+
+    /**
      * 构造方法
      */
-    public Response(Integer code, String msg, R result) {
-        this.code = code;
-        this.msg = msg;
+    public Response(ErrorCode errorCode, R result) {
+        this(errorCode);
         this.result = result;
     }
 

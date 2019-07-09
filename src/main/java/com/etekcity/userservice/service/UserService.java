@@ -2,9 +2,7 @@ package com.etekcity.userservice.service;
 
 import javax.servlet.http.HttpServletRequest;
 
-import com.etekcity.userservice.request.ChangePasswordBody;
-import com.etekcity.userservice.request.RegisterAndLoginBody;
-import com.etekcity.userservice.request.UpdateUserInfoBody;
+import com.etekcity.userservice.request.*;
 import com.etekcity.userservice.response.rsp.Response;
 
 /**
@@ -19,7 +17,7 @@ public interface UserService {
      * @param requestBody requestBody
      * @return Response
      */
-    Response register(RegisterAndLoginBody requestBody);
+    Response register(RegisterBody requestBody);
 
     /**
      * 登录
@@ -27,7 +25,7 @@ public interface UserService {
      * @param requestBody requestBody
      * @return Response
      */
-    Response login(RegisterAndLoginBody requestBody);
+    Response login(LoginBody requestBody);
 
     /**
      * 登出

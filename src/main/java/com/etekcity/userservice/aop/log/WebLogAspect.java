@@ -36,19 +36,21 @@ public class WebLogAspect {
         //开始打印请求日志
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         HttpServletRequest request = attributes.getRequest();
-        //todo:头部消息打印，这种方法还是不能准确解决问题，先放一放吧,根据方法去做操作还是算了吧
         //打印请求
+        //参数列表长度大于1证明有body
         if (proceedingJoinPoint.getArgs().length > 1) {
             log.info("===========================Request===========================\nHTTP Method   : {}\n"
                             + "URL           : {}\nRequest Args  : {}",
                     request.getMethod(), request.getRequestURL().toString(),
-                    new Gson().toJson(proceedingJoinPoint.getArgs()[0]));
+                    new Gson().toJson(proceedingJoinPoint.getArgs()[1]));
         }
+        //参数列表为1没有body，打一下request就行了
         if (proceedingJoinPoint.getArgs().length == 1) {
             log.info("===========================Request===========================\nHTTP Method   : {}\n"
                             + "URL           : {}",
                     request.getMethod(), request.getRequestURL().toString());
         }
+
         Object result = proceedingJoinPoint.proceed();
         //打印出参
         log.info("===========================Response===========================\nResponse Args : {}",

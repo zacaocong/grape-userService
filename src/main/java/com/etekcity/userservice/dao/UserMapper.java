@@ -4,8 +4,7 @@ import java.util.Date;
 
 import org.apache.ibatis.annotations.*;
 
-import com.etekcity.userservice.entity.UserInfo;
-import com.etekcity.userservice.modle.User;
+import com.etekcity.userservice.model.User;
 
 
 /**
@@ -63,13 +62,14 @@ public interface UserMapper {
 
     /**
      * 通过Id获取用户信息
+     * User中多出来的属性比如password会被自动赋值为空
      *
      * @param userId userId
      * @return UserInfo
      */
     @Select("select user_id as userId,email as email,nickname as nickname,address as address,"
             + " create_at as createAt,update_at as updateAt from user_info where user_id = #{userId}")
-    UserInfo getUserInfoById(String userId);
+    User getUserInfoById(String userId);
 
     /**
      * 通过Id来更新nickname

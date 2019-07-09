@@ -1,6 +1,7 @@
 package com.etekcity.userservice.redis.entity;
 
 import java.util.Date;
+import java.util.Objects;
 
 /**
  * userId value
@@ -69,5 +70,23 @@ public class UserIdValue implements Comparable<UserIdValue> {
     public int compareTo(UserIdValue o) {
         //date也有compareto,这里顺序还不确定，就是由早到晚
         return createAt.compareTo(o.getCreateAt());
+    }
+
+    /**
+     * 哈希值，当判断两个元素是否相同时会直接先判断hashCode是否一致，
+     * 不一致再用equal进行判断
+     * */
+    @Override
+    public int hashCode() {
+        return Objects.hash(token,createAt);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof UserIdValue)) {
+            return false;
+        }
+        UserIdValue userIdValue = (UserIdValue) o;
+        return token.equals(userIdValue.getToken()) && createAt.equals(userIdValue.getCreateAt());
     }
 }

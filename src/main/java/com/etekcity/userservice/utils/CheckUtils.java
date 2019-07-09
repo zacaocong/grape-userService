@@ -35,10 +35,8 @@ public class CheckUtils {
      * @return boolean  符合要求;1 邮箱长度不符合要求;2 邮箱格式错误
      */
     public static boolean checkEmail(String email) {
-        if (email.length() > MAX_EMAIL_LENGTH || email.length() < MIN_EMAIL_LENGTH) {
-            return false;
-        }
-        return email.matches(EMAIL_REG);
+        return email.length() <= MAX_EMAIL_LENGTH && email.length() >= MIN_EMAIL_LENGTH &&
+                email.matches(EMAIL_REG);
     }
 
 
@@ -53,9 +51,9 @@ public class CheckUtils {
         if (password.length() > MAX_PASSWORD_LENGTH || password.length() < MIN_PASSWORD_LENGTH) {
             return false;
         }
-        char[] chars = password.toCharArray();
-        for (int i = 0; i < chars.length; i++) {
-            if ((int) chars[i] < 33 || (int) chars[i] > 126) {
+        for (int i = 0; i < password.length(); i++) {
+            char c = password.charAt(i);
+            if (c < 33 || c > 126) {
                 return false;
             }
         }
