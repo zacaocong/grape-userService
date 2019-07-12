@@ -34,6 +34,13 @@ public class StringUtils {
     }
 
     /**
+     * 去掉字符串中的-
+     * */
+    public static String lockKeyUserId(String userId) {
+        return userId.replaceAll("-", "");
+    }
+
+    /**
      * 生成redis中药存储的key ： userId token:
      */
     public static String formatCreateKey(String userId, String token) {

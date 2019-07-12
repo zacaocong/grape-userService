@@ -1,5 +1,7 @@
 package com.etekcity.userservice.request;
 
+import javax.validation.constraints.NotEmpty;
+
 /**
  * 邮箱密码
  * 登录注册都用同一请求体
@@ -7,7 +9,9 @@ package com.etekcity.userservice.request;
  * @author grape
  */
 public class RegisterAndLoginBody {
+    @NotEmpty
     private String email;
+    @NotEmpty
     private String password;
 
     public String getEmail() {

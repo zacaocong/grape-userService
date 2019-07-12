@@ -25,57 +25,57 @@ public class RedisServiceImpl<V> implements RedisService<String, V> {
 
     @Override
     public boolean existsKey(String key) {
-        log.info("method: existsKey ,key:{}", key);
+        log.debug("method: existsKey ,key:{}", key);
         return redisTemplate.hasKey(key);
     }
 
     @Override
     public boolean deleteKey(String key) {
-        log.info("method: deleteKey ,key:{}", key);
+        log.debug("method: deleteKey ,key:{}", key);
         return redisTemplate.delete(key);
     }
 
     @Override
     public void expireKey(String key, long time, TimeUnit timeUnit) {
-        log.info("set expireAt by time,method: expireKey,key:{}", key);
+        log.debug("set expireAt by time,method: expireKey,key:{}", key);
         redisTemplate.expire(key, time, timeUnit);
     }
 
     @Override
     public void expireKeyAt(String key, Date date) {
-        log.info("set expireAt by date,method: expireKeyAt,key:{}", key);
+        log.debug("set expireAt by date,method: expireKeyAt,key:{}", key);
         redisTemplate.expireAt(key, date);
     }
 
     @Override
     public long getKeyExpire(String key, TimeUnit timeUnit) {
-        log.info("get expire time,method: getKeyExpire,key:{}", key);
+        log.debug("get expire time,method: getKeyExpire,key:{}", key);
         return redisTemplate.getExpire(key, timeUnit);
     }
 
     @Override
     public void persistKey(String key) {
-        log.info("method: psersistKey,key:{}", key);
+        log.debug("method: psersistKey,key:{}", key);
         redisTemplate.persist(key);
     }
 
     @Override
     public V get(String key) {
-        log.info("method: get,key:{}", key);
+        log.debug("method: get,key:{}", key);
         ValueOperations<String, V> operations = redisTemplate.opsForValue();
         return operations.get(key);
     }
 
     @Override
     public void set(String key, V value) {
-        log.info("method: set,key:{},value:{}", key, value);
+        log.debug("method: set,key:{},value:{}", key, value);
         ValueOperations<String, V> operations = redisTemplate.opsForValue();
         operations.set(key, value);
     }
 
     @Override
     public void set(String key, V value, Long expireTime) {
-        log.info("method: set,key:{},value:{},expireTIme:{}", key, value, expireTime);
+        log.debug("method: set,key:{},value:{},expireTIme:{}", key, value, expireTime);
         ValueOperations<String, V> operations = redisTemplate.opsForValue();
         operations.set(key, value);
         redisTemplate.expire(key, expireTime, TimeUnit.SECONDS);

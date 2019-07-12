@@ -22,6 +22,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @Slf4j
 public class WebLogAspect {
+
+    Gson gson = new Gson();
+
     @Pointcut("execution(public * com.etekcity.userservice.controller..*.*(..))")
     public void webLog() {
 
@@ -32,31 +35,25 @@ public class WebLogAspect {
      */
     @Around("webLog()")
     public Object doAround(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
-        long startTime = System.currentTimeMillis();
         //开始打印请求日志
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         HttpServletRequest request = attributes.getRequest();
         //打印请求
         //参数列表长度大于1证明有body
         if (proceedingJoinPoint.getArgs().length > 1) {
-            log.info("===========================Request===========================\nHTTP Method   : {}\n"
-                            + "URL           : {}\nRequest Args  : {}",
+            log.info("Request HTTP Method   : {} URL           : {} Request Args  : {}",
                     request.getMethod(), request.getRequestURL().toString(),
                     new Gson().toJson(proceedingJoinPoint.getArgs()[1]));
         }
         //参数列表为1没有body，打一下request就行了
         if (proceedingJoinPoint.getArgs().length == 1) {
-            log.info("===========================Request===========================\nHTTP Method   : {}\n"
-                            + "URL           : {}",
+            log.info("Request HTTP Method   : {} URL           : {}",
                     request.getMethod(), request.getRequestURL().toString());
         }
 
         Object result = proceedingJoinPoint.proceed();
         //打印出参
-        log.info("===========================Response===========================\nResponse Args : {}",
-                JSONObject.toJSONString(result));
-        //执行耗时
-        log.info("Time-Consuming: {} ms", System.currentTimeMillis() - startTime);
+        log.info("Response Response Args : {}", JSONObject.toJSONString(result));
         return result;
     }
 

@@ -3,6 +3,8 @@ package com.etekcity.userservice.aop.token;
 import javax.servlet.http.HttpServletRequest;
 
 import com.etekcity.userservice.redis.entity.TokenValue;
+import com.etekcity.userservice.response.result.EmptyResult;
+import com.etekcity.userservice.response.result.GetUserInfoResult;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -74,42 +76,42 @@ public class WebCheckAspect {
         String email = requestBody.getEmail();
         String password = requestBody.getPassword();
         //邮箱密码规范性校验
-        if (email == null || !CheckUtils.checkEmail(email)) {
-            return Response.emptyResp(ErrorCode.EMAIL_ILLEGAL);
+        if (null == email || !CheckUtils.checkEmail(email)) {
+            return Response.genResp(ErrorCode.EMAIL_ILLEGAL);
         }
-        if (password == null || !CheckUtils.checkPassword(password)) {
-            return Response.emptyResp(ErrorCode.PASSWORD_ILLEGAL);
+        if (null == password || !CheckUtils.checkPassword(password)) {
+            return Response.genResp(ErrorCode.PASSWORD_ILLEGAL);
         }
         //数据库操作
         try {
             //判断是否已注册
-            if (userMapper.getUserByEmail(email) == null) {
+            if (null == userMapper.getUserByEmail(email)) {
                 //未注册，登录方法要求不能未注册
-                if (proceedingJoinPoint.getSignature().getName().equals(Method.LOGIN)) {
+                if (Method.LOGIN.equals(proceedingJoinPoint.getSignature().getName())) {
                     //未注册 && 调用方法为 登录时
-                    return Response.emptyResp(ErrorCode.EMAIL_UNEXIST);
+                    return Response.genResp(ErrorCode.EMAIL_UNEXIST);
                 }
                 //未注册 && 调用方法为 注册 则进入UserService正常流程进行业务处理
             } else {
                 //已注册，注册方法要求不能已注册
-                if (proceedingJoinPoint.getSignature().getName().equals(Method.REGISTER)) {
+                if (Method.REGISTER.equals(proceedingJoinPoint.getSignature().getName())) {
                     //已注册 && 调用方法为 注册时
-                    return Response.emptyResp(ErrorCode.EMAIL_REGISTERED);
+                    return Response.genResp(ErrorCode.EMAIL_REGISTERED);
                 }
                 //已注册，检查登录密码是否正确，即属于该邮箱,在调用方法为登陆时检验
-                if (proceedingJoinPoint.getSignature().getName().equals(Method.LOGIN)) {
+                if (Method.LOGIN.equals(proceedingJoinPoint.getSignature().getName())) {
                     //生成加密后的暗文密码用于校验
                     String encryptedPassword= MD5Utils.getMD5Str(password);
                     if (!encryptedPassword.equals(userMapper.findPasswordByEmail(email))) {
                         //密码错误
-                        return Response.emptyResp(ErrorCode.PASSWORD_ERROR);
+                        return Response.genResp(ErrorCode.PASSWORD_ERROR);
                     }
                 }
 
             }
         } catch (Exception e) {
             log.error("邮箱密码校验时发生异常", e);
-            return Response.emptyResp(ErrorCode.SEVER_INTERNAL_ERROR);
+            return Response.genResp(ErrorCode.SEVER_INTERNAL_ERROR);
         }
 
         //原有流程
@@ -119,7 +121,7 @@ public class WebCheckAspect {
         } catch (Exception e) {
             //异常则返回内部错误
             log.error("internal error", e);
-            return Response.emptyResp(ErrorCode.SEVER_INTERNAL_ERROR);
+            return Response.genResp(ErrorCode.SEVER_INTERNAL_ERROR);
         }
     }
 
@@ -138,7 +140,7 @@ public class WebCheckAspect {
         String authorization = request.getHeader(HeaderFields.AUTHORIZATION);
         //传入为userId token，校验authorization合法性
         if (!CheckUtils.checkAuthor(authorization)) {
-            return Response.emptyResp(ErrorCode.TOKEN_ILLEGAL);
+            return Response.genResp(ErrorCode.TOKEN_ILLEGAL);
         }
         //authorization为合法参数，获取userId和token
         String[] params = StringUtils.splitStrings(authorization);
@@ -149,14 +151,14 @@ public class WebCheckAspect {
         //读redis，是否存在该userId:token
         try {
             if (!tokenValueRedisService.existsKey(token)) {
-                return Response.emptyResp(ErrorCode.TOKEN_DISABLED);
+                return Response.genResp(ErrorCode.TOKEN_DISABLED);
             }
-            if (!tokenValueRedisService.get(token).getUserId().equals(userId)) {
-                return Response.emptyResp(ErrorCode.TOKEN_ERROR);
+            if (!userId.equals(tokenValueRedisService.get(token).getUserId())) {
+                return Response.genResp(ErrorCode.TOKEN_ERROR);
             }
         } catch (Exception e) {
             log.error("redis exist 校验时发生异常", e);
-            return Response.emptyResp(ErrorCode.SEVER_INTERNAL_ERROR);
+            return Response.genResp(ErrorCode.SEVER_INTERNAL_ERROR);
         }
 
         //原有流程
@@ -166,7 +168,7 @@ public class WebCheckAspect {
         } catch (Exception e) {
             //异常则返回内部错误
             log.error("internal error", e);
-            return Response.emptyResp(ErrorCode.SEVER_INTERNAL_ERROR);
+            return Response.genResp(ErrorCode.SEVER_INTERNAL_ERROR);
         }
     }
 }

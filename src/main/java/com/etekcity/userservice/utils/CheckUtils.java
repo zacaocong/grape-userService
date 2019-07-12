@@ -64,14 +64,14 @@ public class CheckUtils {
      * 昵称32且支持emoji ,支持可在类中或Impl中实现
      */
     public static boolean checkNickname(String nickname) {
-        return nickname.length() < MAX_NICKNAME_LENGTH;
+        return null == nickname || nickname.length() < MAX_NICKNAME_LENGTH;
     }
 
     /**
      * 地址255
      */
     public static boolean checkAddress(String address) {
-        return address.length() < MAX_ADDRESS_LENGTH;
+        return null == address || address.length() < MAX_ADDRESS_LENGTH;
     }
 
     /**

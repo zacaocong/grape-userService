@@ -10,7 +10,7 @@ import java.util.Date;
  *
  * @author grape
  * 在redis中第一个简单查询结构中  key：token  value：TokenValue（userId， createAt）此处userId便于查询
- * 在redis第二个结构中            key：userId        value：TreeSet<UserIdValue>   (authorization,Date) 便于查上表
+ * 在redis第二个结构中            key：userId        value：TreeSet<ValueTokenAndAtOfKeyUserId>   (authorization,Date) 便于查上表
  */
 public class TokenValue {
     /**

@@ -1,12 +1,16 @@
 package com.etekcity.userservice.request;
 
+import javax.validation.constraints.NotEmpty;
+
 /**
  * 修改密码的请求消息体
  *
  * @author grape
  */
 public class ChangePasswordBody {
+    @NotEmpty
     private String oldPassword;
+    @NotEmpty
     private String newPassword;
 
     public String getOldPassword() {

@@ -1,6 +1,7 @@
 package com.etekcity.userservice.controller;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 
 import com.etekcity.userservice.request.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,34 +26,42 @@ public class UserController {
     @Autowired
     private UserServiceImpl userService;
 
-    @PostMapping("/register")
-    public Response registerControl(HttpServletRequest request, @RequestBody RegisterBody requestBody) {
+    @PostMapping(value = "/register", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response registerControl(HttpServletRequest request, @RequestBody @Valid RegisterBody requestBody) {
         return userService.register(requestBody);
     }
 
-    @PostMapping("/login")
-    public Response loginControl(HttpServletRequest request, @RequestBody LoginBody requestBody) {
+    @PostMapping(value = "/login", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response loginControl(HttpServletRequest request, @RequestBody @Valid LoginBody requestBody) {
         return userService.login(requestBody);
     }
 
-    @PostMapping("/logout")
-        public Response logoutControl(HttpServletRequest request) {
-            return userService.logout(request);
-        }
+    @PostMapping(value = "/logout", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response logoutControl(HttpServletRequest request) {
+        return userService.logout(request);
+    }
 
-        @PostMapping("/getUserInfo")
-        public Response getUserInfoControl(HttpServletRequest request) {
-            return userService.getUserInfo(request);
-        }
+    @PostMapping(value = "/getUserInfo", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response getUserInfoControl(HttpServletRequest request) {
+        return userService.getUserInfo(request);
+    }
 
-        @PostMapping("/updateUserInfo")
-        public Response updateUserInfoControl(HttpServletRequest request, @RequestBody UpdateUserInfoBody requestBody) {
-            return userService.updateUserInfo(request, requestBody);
-        }
+    @PostMapping(value = "/updateUserInfo", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response updateUserInfoControl(HttpServletRequest request, @RequestBody @Valid UpdateUserInfoBody
+            requestBody) {
+        return userService.updateUserInfo(request, requestBody);
+    }
 
-        @PostMapping("/changePassword")
-        public Response changePasswordControl(HttpServletRequest request, @RequestBody ChangePasswordBody requestBody) {
-            return userService.changePassword(request, requestBody);
+    @PostMapping(value = "/changePassword", produces = "application/json;charset=UTF-8",
+            consumes = "application/json;charset=UTF-8")
+    public Response changePasswordControl(HttpServletRequest request, @RequestBody @Valid ChangePasswordBody
+            requestBody) {
+        return userService.changePassword(request, requestBody);
     }
 
 }
