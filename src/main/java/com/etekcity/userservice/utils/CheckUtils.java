@@ -80,26 +80,6 @@ public class CheckUtils {
     public static boolean checkAuthor(String authorization) {
         return authorization.matches(AUTHOR_REG);
     }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

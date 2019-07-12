@@ -13,16 +13,3 @@ import java.lang.annotation.*;
 public @interface CheckToken {
     String value() default "";
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

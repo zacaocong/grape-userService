@@ -8,9 +8,9 @@ import javax.validation.constraints.NotEmpty;
  * @author grape
  */
 public class ChangePasswordBody {
-    @NotEmpty
+    @NotEmpty(message = "oldPassword 不能为空")
     private String oldPassword;
-    @NotEmpty
+    @NotEmpty(message = "newPassword 不能为空")
     private String newPassword;
 
     public String getOldPassword() {

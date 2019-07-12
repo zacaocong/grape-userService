@@ -19,20 +19,11 @@ public interface UserMapper {
     /**
      * 查询邮箱是否存在，返回User对象
      * 登陆会调用此方法
-     * @Result是映射，但是配置中有驼峰转换，所以可以省略掉
+     *  /@Result 是映射，但是配置中有驼峰转换，所以可以省略掉
      *
      * @param email email
      * @return User
      */
-//    @Results({
-//            @Result(property = "userId", column = "user_id"),
-//            @Result(property = "email", column = "email"),
-//            @Result(property = "password", column = "password"),
-//            @Result(property = "nickname", column = "nickname"),
-//            @Result(property = "address", column = "address"),
-//            @Result(property = "createAt", column = "create_at"),
-//            @Result(property = "updateAt", column = "update_at")
-//    })
     @Select("select * from user_info WHERE email = #{email}")
     User getUserByEmail(String email);
 
@@ -132,20 +123,5 @@ public interface UserMapper {
      */
     @Select("select password as password from user_info where user_id = #{userId}")
     String findPasswordById(String userId);
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

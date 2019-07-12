@@ -1,0 +1,6 @@
+VERSION
+SERVICE=grape-userService
+
+SERVICE.VERSION=V1.0.0.0
+CHANGELOG
+【新增】完成初稿

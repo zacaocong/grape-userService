@@ -9,9 +9,9 @@ import javax.validation.constraints.NotEmpty;
  * @author grape
  */
 public class RegisterAndLoginBody {
-    @NotEmpty
+    @NotEmpty(message = "email 不能为空")
     private String email;
-    @NotEmpty
+    @NotEmpty(message = "password 不能为空")
     private String password;
 
     public String getEmail() {
